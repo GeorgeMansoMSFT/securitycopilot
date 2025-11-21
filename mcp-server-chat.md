@@ -23,7 +23,7 @@ Find the top three users that are at risk and explain why they are at risk.
 
 <details>
   <summary>Used 1 references</summary>
-  <p>📄 file:mcp.json</p>
+  <p><code>📄 file:mcp.json</code></p>
 </details>
 
 
@@ -46,77 +46,77 @@ I'll create a short todo list for the steps I'll run, then I'll query the Sentin
 Now I'll discover which Sentinel tables exist in the workspace so I can build the right KQL (expected outcome: list of table schemas relevant to user sign-ins and alerts). I'll run a tables discovery query.
 <details>
   <summary>Running Semantic search on table catalog</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "Find tables relevant for user risk analysis: sign-in logs, authentication failures, risky sign-ins, alerts, and endpoint/security alerts (e.g., SigninLogs, SigninTable, SecurityAlert, AuditLogs, OfficeActivity, Heartbeat, DeviceEvents). Return their schemas."
-}</p>
+}</code></p>
 </details>
 
 I'll update the todo list to mark discovery done and start the KQL query step, then run a KQL query to compute weighted risk scores and return the top 3 users. Expected outcome: updated todo list and query result with top-3 users and risk reasons.
 
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "let start = ago(30d);\n// Latest risk per user\nlet riskyUsers = AADRiskyUsers\n| where TimeGenerated >= start\n| summarize arg_max(TimeGenerated, RiskLevel, RiskState, RiskLastUpdatedDateTime, UserDisplayName) by UserPrincipalName, UserId;\n// Aggregate user risk events\nlet userRiskEvents = AADUserRiskEvents\n| where TimeGenerated >= start\n| summarize risk_events = count(), high_events = countif(RiskLevel == \"high\"), medium_events = countif(RiskLevel == \"medium\"), low_events = countif(RiskLevel == \"low\") by UserPrincipalName, UserId;\n// Sign-in risk signals\nlet signInRisks = SigninLogs\n| where TimeGenerated >= start\n| summarize signins = count(), risky_signins = countif(IsRisky == true or RiskLevelDuringSignIn == \"high\" or RiskLevel == \"high\") by UserPrincipalName, UserId;\n// Alerts that list a compromised entity (user)\nlet userAlerts = SecurityAlert\n| where TimeGenerated >= start\n| where isnotempty(CompromisedEntity)\n| summarize alerts = count() by CompromisedEntity;\n\nriskyUsers\n| join kind=leftouter userRiskEvents on UserPrincipalName\n| join kind=leftouter signInRisks on UserPrincipalName\n| join kind=leftouter (userAlerts) on $left.UserPrincipalName == $right.CompromisedEntity\n| extend RiskLevel = todynamic(RiskLevel) // safe-cast\n| extend risk_value = case(RiskLevel==\"high\",50, RiskLevel==\"medium\",20, RiskLevel==\"low\",10, 0)\n| extend ev = coalesce(risk_events, 0), he = coalesce(high_events, 0), me = coalesce(medium_events, 0), le = coalesce(low_events, 0), rs = coalesce(risky_signins,0), al = coalesce(alerts,0), si = coalesce(signins,0)\n| extend score = risk_value + ev*3 + rs*7 + al*12 + he*5 + me*2\n| project UserPrincipalName, UserDisplayName, UserId, RiskLevel, RiskState, RiskLastUpdatedDateTime, risk_events=ev, high_events=he, medium_events=me, low_events=le, signins=si, risky_signins=rs, alerts=al, score\n| order by score desc\n| take 3\n",
   "workspaceId": ""
-}</p>
+}</code></p>
 </details>
 
 I'll re-run a simplified KQL that groups and joins only on UserPrincipalName (avoids missing UserId errors) and returns the top 3 scored users. Expected outcome: top-3 user rows with fields and scores.
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "let start = ago(30d);\n// Latest risk per user (by UPN)\nlet riskyUsers = AADRiskyUsers\n| where TimeGenerated >= start\n| summarize arg_max(TimeGenerated, RiskLevel, RiskState, RiskLastUpdatedDateTime, UserDisplayName) by UserPrincipalName;\n// Aggregate user risk events\nlet userRiskEvents = AADUserRiskEvents\n| where TimeGenerated >= start\n| summarize risk_events = count(), high_events = countif(RiskLevel == \"high\"), medium_events = countif(RiskLevel == \"medium\"), low_events = countif(RiskLevel == \"low\") by UserPrincipalName;\n// Sign-in risk signals\nlet signInRisks = SigninLogs\n| where TimeGenerated >= start\n| summarize signins = count(), risky_signins = countif(IsRisky == true or RiskLevelDuringSignIn == \"high\" or RiskLevel == \"high\") by UserPrincipalName;\n// Alerts that list a compromised entity (user)\nlet userAlerts = SecurityAlert\n| where TimeGenerated >= start\n| where isnotempty(CompromisedEntity)\n| summarize alerts = count() by CompromisedEntity;\n\nriskyUsers\n| join kind=leftouter userRiskEvents on UserPrincipalName\n| join kind=leftouter signInRisks on UserPrincipalName\n| join kind=leftouter (userAlerts) on $left.UserPrincipalName == $right.CompromisedEntity\n| extend RiskLevel = tostring(RiskLevel)\n| extend risk_value = case(RiskLevel==\"high\",50, RiskLevel==\"medium\",20, RiskLevel==\"low\",10, 0)\n| extend ev = coalesce(risk_events, 0), he = coalesce(high_events, 0), me = coalesce(medium_events, 0), le = coalesce(low_events, 0), rs = coalesce(risky_signins,0), al = coalesce(alerts,0), si = coalesce(signins,0)\n| extend score = risk_value + ev*3 + rs*7 + al*12 + he*5 + me*2\n| project UserPrincipalName, UserDisplayName, RiskLevel, RiskState, RiskLastUpdatedDateTime, risk_events=ev, high_events=he, medium_events=me, low_events=le, signins=si, risky_signins=rs, alerts=al, score\n| order by score desc\n| take 3\n",
   "workspaceId": ""
-}</p>
+}</code></p>
 </details>
 
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "let start = ago(30d);\nlet riskyUsers = AADRiskyUsers\n| where TimeGenerated >= start\n| summarize RiskLevel = any(RiskLevel), RiskState = any(RiskState), RiskLastUpdated = max(RiskLastUpdatedDateTime), UserDisplayName = any(UserDisplayName) by UserPrincipalName;\nlet userRiskEvents = AADUserRiskEvents\n| where TimeGenerated >= start\n| summarize risk_events = count(), high_events = countif(RiskLevel == \"high\"), medium_events = countif(RiskLevel == \"medium\"), low_events = countif(RiskLevel == \"low\") by UserPrincipalName;\nlet signInRisks = SigninLogs\n| where TimeGenerated >= start\n| summarize signins = count(), risky_signins = countif(IsRisky == true or RiskLevelDuringSignIn == \"high\" or RiskLevel == \"high\") by UserPrincipalName;\nlet userAlerts = SecurityAlert\n| where TimeGenerated >= start\n| where isnotempty(CompromisedEntity)\n| summarize alerts = count() by CompromisedEntity;\n\nriskyUsers\n| join kind=leftouter userRiskEvents on UserPrincipalName\n| join kind=leftouter signInRisks on UserPrincipalName\n| join kind=leftouter (userAlerts) on $left.UserPrincipalName == $right.CompromisedEntity\n| extend RiskLevel = tostring(RiskLevel)\n| extend risk_value = case(RiskLevel==\"high\",50, RiskLevel==\"medium\",20, RiskLevel==\"low\",10, 0)\n| extend ev = coalesce(risk_events, 0), he = coalesce(high_events, 0), me = coalesce(medium_events, 0), le = coalesce(low_events, 0), rs = coalesce(risky_signins,0), al = coalesce(alerts,0), si = coalesce(signins,0)\n| extend score = risk_value + ev*3 + rs*7 + al*12 + he*5 + me*2\n| project UserPrincipalName, UserDisplayName, RiskLevel, RiskState, RiskLastUpdated, risk_events=ev, high_events=he, medium_events=me, low_events=le, signins=si, risky_signins=rs, alerts=al, score\n| order by score desc\n| take 3\n",
   "workspaceId": ""
-}</p>
+}</code></p>
 </details>
 
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "let start = ago(30d);\nlet riskyUsers = AADRiskyUsers\n| where TimeGenerated >= start\n| summarize RiskLevel = any(RiskLevel), RiskState = any(RiskState), RiskLastUpdated = max(RiskLastUpdatedDateTime), UserDisplayName = any(UserDisplayName) by UserPrincipalName;\nlet userRiskEvents = AADUserRiskEvents\n| where TimeGenerated >= start\n| summarize risk_events = count() by UserPrincipalName;\nlet signInRisks = SigninLogs\n| where TimeGenerated >= start\n| summarize signins = count(), risky_signins = countif(IsRisky == true or RiskLevelDuringSignIn == \"high\" or RiskLevel == \"high\") by UserPrincipalName;\nlet userAlerts = SecurityAlert\n| where TimeGenerated >= start\n| where isnotempty(CompromisedEntity)\n| summarize alerts = count() by CompromisedEntity;\n\nriskyUsers\n| join kind=leftouter userRiskEvents on UserPrincipalName\n| join kind=leftouter signInRisks on UserPrincipalName\n| join kind=leftouter (userAlerts) on $left.UserPrincipalName == $right.CompromisedEntity\n| extend RiskLevel = tostring(RiskLevel)\n| extend risk_value = case(RiskLevel==\"high\",50, RiskLevel==\"medium\",20, RiskLevel==\"low\",10, 0)\n| extend ev = coalesce(risk_events, 0), rs = coalesce(risky_signins,0), al = coalesce(alerts,0), si = coalesce(signins,0)\n| extend score = risk_value + ev*4 + rs*8 + al*12\n| project UserPrincipalName, UserDisplayName, RiskLevel, RiskState, RiskLastUpdated, risk_events=ev, signins=si, risky_signins=rs, alerts=al, score\n| order by score desc\n| take 3\n",
   "workspaceId": ""
-}</p>
+}</code></p>
 </details>
 
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "AADRiskyUsers\n| where TimeGenerated >= ago(30d)\n| summarize LastRiskLevel = any(RiskLevel), LastRiskState = any(RiskState), LastUpdated = max(RiskLastUpdatedDateTime), UserDisplayName = any(UserDisplayName) by UserPrincipalName\n| extend score = case(LastRiskLevel==\"high\",50, LastRiskLevel==\"medium\",20, LastRiskLevel==\"low\",10, 0)\n| order by score desc, LastUpdated desc\n| take 3\n",
   "workspaceId": ""
-}</p>
+}</code></p>
 </details>
 
 Progress update: I discovered available tables and ran a first query against `AADRiskyUsers` (30d) — it returned 2 users, both with RiskLevel=none. Next I'll check historical user risk events to surface users with the most risk detections over the last 90 days (expected: top 3 users by detected events). I'll run that query now.
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "AADUserRiskEvents\n| where TimeGenerated >= ago(90d)\n| summarize events = count(), lastRiskLevel = any(RiskLevel), lastRiskState = any(RiskState), lastDetected = max(DetectedDateTime) by UserPrincipalName, UserDisplayName\n| order by events desc\n| take 3\n",
   "workspaceId": ""
-}</p>
+}</code></p>
 </details>
 
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "SigninLogs\n| where TimeGenerated >= ago(90d)\n| summarize signins = count(), risky_signins = countif(IsRisky==true or RiskLevelDuringSignIn==\"high\" or RiskLevel==\"high\") by UserPrincipalName, UserDisplayName\n| where risky_signins > 0\n| order by risky_signins desc, signins desc\n| take 3\n",
   "workspaceId": ""
-}</p>
+}</code></p>
 </details>
 
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "SigninLogs\n| where TimeGenerated >= ago(90d)\n| summarize signins = count(), risky_signins = countif(IsRisky == true) by UserPrincipalName, UserDisplayName\n| where risky_signins > 0\n| order by risky_signins desc, signins desc\n| take 3\n",
   "workspaceId": ""
-}</p>
+}</code></p>
 </details>
 
 ## What I did next
@@ -190,38 +190,38 @@ I'll create a tracked todo list and then run a set of focused KQL queries in par
 
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "SigninLogs\n| where TimeGenerated >= ago(180d) and UserPrincipalName == \"adm-gmanso@gvmsec.com\"\n| project TimeGenerated, UserPrincipalName, UserDisplayName, IPAddress, Location, IsRisky, RiskLevel, ResultType, ConditionalAccessStatus, AppDisplayName, UserAgent, DeviceDetail\n| order by TimeGenerated desc\n| limit 200"
-}</p>
+}</code></p>
 </details>
 
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "AADUserRiskEvents\n| where TimeGenerated >= ago(365d) and UserPrincipalName == \"adm-gmanso@gvmsec.com\"\n| project DetectedDateTime, TimeGenerated, RiskLevel, RiskState, RiskDetail, CorrelationId, Activity\n| order by DetectedDateTime desc\n| limit 200"
-}</p>
+}</code></p>
 </details>
 
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "AADRiskyUsers\n| where UserPrincipalName == \"adm-gmanso@gvmsec.com\"\n| project TimeGenerated, RiskLevel, RiskState, RiskLastUpdatedDateTime, UserDisplayName\n| order by TimeGenerated desc\n| limit 50"
-}</p>
+}</code></p>
 </details>
 
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "SecurityAlert\n| where TimeGenerated >= ago(365d) and (tolower(CompromisedEntity) == \"adm-gmanso@gvmsec.com\" or tostring(Entities) has \"adm-gmanso@gvmsec.com\")\n| project TimeGenerated, AlertName, AlertSeverity, CompromisedEntity, Entities, Description, ProviderName\n| order by TimeGenerated desc\n| limit 200"
-}</p>
+}</code></p>
 </details>
 
 I'll fix the SigninLogs query (drop RiskLevel projection) and run it; expected outcome: retrieve sign-in records for adm-gmanso for the last 180 days so we can identify IPs, locations, CA results and correlate with alerts. After that I'll update the todo list statuses.
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
-  <p>Completed with input: {
+  <p><code>Completed with input: {
   "query": "SigninLogs\n| where TimeGenerated >= ago(180d) and UserPrincipalName == \"adm-gmanso@gvmsec.com\"\n| project TimeGenerated, UserPrincipalName, UserDisplayName, IPAddress, Location, IsRisky, ResultType, ConditionalAccessStatus, AppDisplayName, UserAgent, DeviceDetail\n| order by TimeGenerated desc\n| limit 500"
-}</p>
+}</code></p>
 </details>
 
 ## Quick progress update

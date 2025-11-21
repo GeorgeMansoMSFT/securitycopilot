@@ -69,6 +69,24 @@ Now I'll discover which Sentinel tables exist in the workspace so I can build th
 }</code></p>
 </details>
 
+```
+Updating tasks and running queries
+
+I’ve got a list of relevant tables: SigninLogs, AADUserRiskEvents, AADRiskyUsers, SecurityAlert, and AuditLogs. So, my next step is to run a KQL query to find the top 3 users at risk. I also need to update my to-do list: mark to-do 2 as completed and set to-do 3 to in-progress. I'll make sure to write out the full list to update the statuses correctly. Once that's done, I’ll combine signals from AADRiskyUsers, AADUserRiskEvents, SigninLogs, and SecurityAlert into my KQL query.
+
+Formulating a risk assessment strategy
+
+My approach involves using AADRiskyUsers to identify each user's current risk level and state. Next, I’ll count the risky events from AADUserRiskEvents within the last 30 days, grouping them by UserPrincipalName and weighing them based on their risk level—high earns 3 points, medium 2, and low 1. I'll also include risky sign-ins from SigninLogs where IsRisky is true. Lastly, I’ll count SecurityAlerts linked to each user, joining on UserPrincipalName or UserId since the fields differ.
+
+Writing KQL for user risk assessment
+
+I’m crafting a KQL query to assess user risks over the past 30 days. First, I’ll grab risky users from AADRiskyUsers, summarizing their latest risk level and state. Next, I’ll look at risk events from AADUserRiskEvents, counting total events and categorizing them by risk level. Then, I’ll analyze sign-in risks from SigninLogs. Finally, I’ll check SecurityAlerts and expand the Entities field to identify any compromised entities linked to users, noting that Entities is a string of names.
+
+Refining the KQL query
+
+I'm simplifying my approach by analyzing SecurityAlerts first, specifically focusing on rows with non-empty CompromisedEntity, and counting those alerts. Then, I'll join this data to the risky users and their risk events based on UserPrincipalName. I also need to join sign-in risks and the summarized alerts. To compute scores, I’ll use a formula based on risk levels and event counts. I'll be careful with KQL functions, making sure to utilize countif instead of sumiff where applicable. Before running the query, I’ll update my to-do list as well.
+```
+
 I'll update the todo list to mark discovery done and start the KQL query step, then run a KQL query to compute weighted risk scores and return the top 3 users. Expected outcome: updated todo list and query result with top-3 users and risk reasons.
 
 <details>

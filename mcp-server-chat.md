@@ -40,7 +40,25 @@ Find the top three users that are at risk and explain why they are at risk.
 @GitHubCopilot Enable: "Enable GPT-5 mini for all clients"
 
 ### Assistant
+```
+Planning task analysis
 
+I need to follow the developer's instructions by using the manage_todo_list tool to plan and track progress. I’ll call functions.manage_todo_list with a todoList array and the operation “write,” since this is a multi-step task, despite it seeming like a single step. Before calling the tool, I must include a one-sentence preamble explaining the outcome. I’ll also need to analyze the provided mcp.json file, which shows server info but lacks user risk data. I might need to analyze Microsoft Sentinel data instead.
+
+Organizing Sentinel queries
+
+I could use mcp_gvmsec-sentin_search_tables to discover relevant tables and then query. The developer tool list includes essential tools for this task. I need to start with a one-line preamble before calling these tools. Even though the prompt mentioned attachments only, I still need to find the top three users at risk, likely querying the Sentinel workspace as the user might expect. My plan is to use manage_todo_list to create to-dos, marking the first one as in progress.
+
+Preparing to query tables
+
+I need to apply the instructions by providing concise updates after any parallel read-only tasks. First, I’ll use functions.mcp_gvmsec-sentin_search_tables to discover relevant tables. It's important to start with a preface explaining what I'm doing and why. After that, I'll run mcp_gvmsec-sentin_query_lake to execute my KQL queries for computing user risk.
+
+Since I don’t know the specific tables yet, I'll use natural language in my query, focusing on user sign-ins, alerts, and risky sign-ins. I’ll call search_tables with a query that identifies tables related to these aspects.
+
+Executing the query steps
+
+I need to run a query after discovering the tables and then consider writing KQL that combines elements like SigninLogs and IdentityProtectionAlerts, but I'll need to adapt based on the returned schema. First, I'll call manage_todo_list to set up my tasks. Then, I’ll call mcp_gvmsec-sentin_search_tables and make sure to provide a preface before that call. After obtaining the results, I'll proceed with my query using the functions tool calls. I’m getting organized to ensure I follow through efficiently.
+```
 I'll create a short todo list for the steps I'll run, then I'll query the Sentinel workspace to find relevant tables (to build a risk query) and run a KQL query to compute the top 3 at-risk users. Expected outcome: todo list saved, table discovery result, then top-3 user list with explanations.
 
 Now I'll discover which Sentinel tables exist in the workspace so I can build the right KQL (expected outcome: list of table schemas relevant to user sign-ins and alerts). I'll run a tables discovery query.
@@ -78,6 +96,15 @@ I'll re-run a simplified KQL that groups and joins only on UserPrincipalName (av
 }</code></p>
 </details>
 
+```
+Troubleshooting Kusto query issues
+
+I’m still seeing an error referencing the 'RiskLevel' in the AADUserRiskEvents. Kusto doesn’t seem to resolve this column, though we found it in the search_tables. Maybe it's spelled differently? This could be because 'RiskLevel' is a keyword, or the summarize function might need the reference to be in the same table. The error indicates 'RiskLevel' may not exist in AADUserRiskEvents. As a workaround, I can use RiskEventType or count total events without splitting by 'RiskLevel'.
+
+Updating the query structure
+
+I need to change the userRiskEvents query to just summarize the risk events by UserPrincipalName, so I'll count them directly. This means I’ll remove the countif usages and any references to high_events. It’s a pretty straightforward update, but I need to ensure I adjust the rest of the query accordingly as well. I just want to streamline things and keep it simple, so this should help clarify the results!
+```
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
   <p><code>Completed with input: {
@@ -111,6 +138,12 @@ Progress update: I discovered available tables and ran a first query against `AA
 }</code></p>
 </details>
 
+```
+Evaluating SigninLogs issue
+
+I'm noticing a potential problem with RiskLevel in the SigninLogs. It seems that the RiskLevel column might not be present in this workspace, but there is an IsRisky column instead. To be safe, I think I should just focus on using IsRisky and maybe skip RiskLevelDuringSignIn since it could be absent. So, I could use a count if IsRisky is true. Let's keep it simple!
+```
+
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>
   <p><code>Completed with input: {
@@ -118,6 +151,20 @@ Progress update: I discovered available tables and ran a first query against `AA
   "workspaceId": ""
 }</code></p>
 </details>
+
+```
+Evaluating risky sign-ins
+
+I’m not finding results for risky sign-ins over zero, so the clear candidate is adm-gmanso@gvmsec.com from AADUserRiskEvents, showing 9 events with a medium risk level. There's also pim-gmanso from AADRiskyUsers, but with no events, just remediated. I should list adm-gmanso as the top user, followed by pim-gmanso. I’ll update the to-do list to mark item 3 as completed and item 4 as in-progress, then prepare a summary for the identified risks.
+
+Recommending actions
+
+I should recommend actions like requiring a password reset, enforcing MFA, investigating alerts, and reviewing recent sign-ins from unusual locations. Also, I want to check SecurityAlert for any compromised entities.
+
+For context, it seems that the only user with meaningful risk is adm-gmanso, who has events. There were only 2 risky user records in the last 30 days, and just one with events in 90 days. I can offer to run further queries or provide an exported CSV.
+
+Next, I'll update the to-do list to mark items 1, 2, and 3 as completed and item 4 as in-progress.
+```
 
 ## What I did next
 - Discovered the relevant Sentinel tables (SigninLogs, AADUserRiskEvents, AADRiskyUsers, SecurityAlert, AuditLogs, etc.).
@@ -185,7 +232,31 @@ Which follow-up would you like? (I recommend immediate targeted investigation an
 lets do what you suggest
 
 ### Assistant
+```
+Planning action steps
 
+The user wants to proceed based on my suggestions, which involves several steps: checking the sign-in history, correlating with SecurityAlert, and preparing an evidence pack along with remediation steps. I need to start by using the todo list tool to manage these tasks. We don't currently have the workspace open, but I can run queries with Sentinel using various functions available. It's important to set up the todo list first and then proceed with the queries, providing updates along the way.
+
+Outlining action steps
+
+I'm planning a sequence of tasks: first, I’ll create a todo list and mark the initial item as in-progress. Then, I need to run several queries related to the user’s sign-in history for the last 90 to 180 days, correlate this with SecurityAlert, and gather relevant risk events. Since these queries are read-only, I can run them in parallel, using the appropriate tools. I must also preface each batch with a brief explanation of the purpose. After some calls, I’ll provide an update on progress. Let’s get those KQL queries ready!
+
+Preparing KQL queries
+
+I’m creating KQL queries for several tasks. For the SigninLogs, I want to filter based on the user's sign-in history over the past 180 days. I’ll project certain columns while using tostring() to ensure safe projections, in case some fields might not exist. Next, I’ll gather AADUserRiskEvents for the last year and create another query for AADRiskyUsers. Lastly, I’ll correlate SecurityAlert data to check if the user appears as a compromised entity. Let's get these all set up!
+
+Setting up SecurityAlert query
+
+I’m crafting a query for SecurityAlert that checks for any alerts related to the user over the last year. I need to make sure to account for the dynamic nature of the Entities field by using tostring() with the has operator. Additionally, I’ll pull data on sign-in anomalies by summarizing the sign-ins based on IP and location.
+
+I'll run these queries in parallel, using the multi_tool_use feature, and I must remember to start by using the todo list tool to track progress throughout this multi-step task.
+
+Organizing the todo list
+
+I'm starting by calling the manage_todo_list to write a complete list of tasks. I’ll mark the first item "Investigate adm-gmanso sign-ins" as in-progress since the instruction is to have one task started. My todo list will include all necessary items, like correlating sign-ins with SecurityAlert and building an evidence pack.
+
+After establishing the list, I’ll use the multi_tool_use.parallel function to run four queries. I need to explain the purpose behind each batch before I report back with progress and findings. It's time to get these tasks going!
+```
 I'll create a tracked todo list and then run a set of focused KQL queries in parallel to collect sign-ins, risk events, risky-user snapshots, and alerts for adm-gmanso@gvmsec.com — expected outcome: a compact evidence set I can use to build the remediation checklist and report. I'll mark the first todo as in-progress before running queries.
 
 <details>
@@ -216,6 +287,15 @@ I'll create a tracked todo list and then run a set of focused KQL queries in par
 }</code></p>
 </details>
 
+```
+Planning security actions
+
+I need to present a summary of evidence and recommend immediate actions: isolating the account, resetting credentials, enforcing MFA, reviewing admin roles, checking devices, monitoring alerts, and blocking IPs. Additionally, I’m thinking about the need for CSV exports – offering downloadable results while realizing that tools might not create files. It seems wise to ask if the user wants to proceed with the export. I’ll also update the todo list statuses: marking item 1 as completed and item 2 as in progress.
+
+Updating todo items
+
+I see that I've already executed the SecurityAlert, but correlation is still pending. So, I need to mark item 2 as in progress and will update this via the manage_todo_list write function. Next, I’ll proceed to run the corrected SigninLogs query. It feels good to have a clear plan on tackling these items and ensuring the list reflects the current status accurately. I'll keep moving forward with the updates!
+```
 I'll fix the SigninLogs query (drop RiskLevel projection) and run it; expected outcome: retrieve sign-in records for adm-gmanso for the last 180 days so we can identify IPs, locations, CA results and correlate with alerts. After that I'll update the todo list statuses.
 <details>
   <summary>Running Execute KQL (Kusto Query Language) query on Microsoft Sentinel data lake</summary>

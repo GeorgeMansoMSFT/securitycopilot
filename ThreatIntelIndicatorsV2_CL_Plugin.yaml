@@ -1,0 +1,134 @@
+Descriptor:
+  Name: ThreatIntelIndicatorsV2CL
+  DisplayName: "Sentinel KQL: Threat Intel Indicators V2"
+  Description: Skills that query a custom ThreatIntelIndicatorsV2_CL table in Microsoft Sentinel for threat intelligence indicators including malicious IPs, suspicious domains, ransomware hashes, and IOCs detected across devices.
+  DescriptionForModel: Use this plugin to query the ThreatIntelIndicatorsV2_CL custom Sentinel table for threat intelligence indicators. Use it when asked to search for malicious IPs, suspicious domains, file hashes, ransomware indicators, or any threat intel data by device or severity.
+  SupportedAuthTypes:
+    - None
+  Settings:
+    - Name: TenantId
+      Label: Tenant ID
+      Description: The Azure AD Tenant ID of the Sentinel workspace.
+      Required: true
+    - Name: SubscriptionId
+      Label: Subscription ID
+      Description: The Azure Subscription ID containing the Sentinel workspace.
+      Required: true
+    - Name: ResourceGroupName
+      Label: Resource Group Name
+      Description: The name of the Resource Group containing the Sentinel workspace.
+      Required: true
+    - Name: WorkspaceName
+      Label: Workspace Name
+      Description: The name of the Log Analytics workspace used by Microsoft Sentinel.
+      Required: true
+
+SkillGroups:
+  - Format: KQL
+    Skills:
+      - Name: GetAllThreatIndicators
+        DisplayName: Get All Threat Intel Indicators
+        Description: Fetches the most recent threat intelligence indicators from ThreatIntelIndicatorsV2_CL showing device, message, severity and type.
+        Settings:
+          Target: Sentinel
+          TenantId: '{{TenantId}}'
+          SubscriptionId: '{{SubscriptionId}}'
+          ResourceGroupName: '{{ResourceGroupName}}'
+          WorkspaceName: '{{WorkspaceName}}'
+          Template: |-
+            ThreatIntelIndicatorsV2_CL
+            | where TimeGenerated > ago(30d)
+            | project TimeGenerated, Device, Message, Severity, Type
+            | sort by TimeGenerated desc
+            | take 50
+
+      - Name: GetThreatIndicatorsBySeverity
+        DisplayName: Get Threat Indicators by Severity
+        Description: Fetches threat intelligence indicators from ThreatIntelIndicatorsV2_CL filtered by severity level. Valid values are Critical, High, Medium, or Low.
+        Inputs:
+          - Name: Severity
+            Description: The severity level to filter by. Must be one of Critical, High, Medium, or Low.
+            Required: true
+        Settings:
+          Target: Sentinel
+          TenantId: '{{TenantId}}'
+          SubscriptionId: '{{SubscriptionId}}'
+          ResourceGroupName: '{{ResourceGroupName}}'
+          WorkspaceName: '{{WorkspaceName}}'
+          Template: |-
+            ThreatIntelIndicatorsV2_CL
+            | where TimeGenerated > ago(30d)
+            | where Severity =~ "{{Severity}}"
+            | project TimeGenerated, Device, Message, Severity, Type
+            | sort by TimeGenerated desc
+
+      - Name: GetThreatIndicatorsByDevice
+        DisplayName: Get Threat Indicators by Device
+        Description: Fetches all threat intelligence indicators from ThreatIntelIndicatorsV2_CL for a specific device or hostname such as WIN-DC-03 or LINUX-WEB-02.
+        Inputs:
+          - Name: Device
+            Description: The device name or hostname to search for, e.g. WIN-DC-03 or LINUX-WEB-02.
+            Required: true
+        Settings:
+          Target: Sentinel
+          TenantId: '{{TenantId}}'
+          SubscriptionId: '{{SubscriptionId}}'
+          ResourceGroupName: '{{ResourceGroupName}}'
+          WorkspaceName: '{{WorkspaceName}}'
+          Template: |-
+            ThreatIntelIndicatorsV2_CL
+            | where TimeGenerated > ago(30d)
+            | where Device =~ "{{Device}}"
+            | project TimeGenerated, Device, Message, Severity, Type
+            | sort by TimeGenerated desc
+
+      - Name: SearchThreatIndicatorByKeyword
+        DisplayName: Search Threat Indicators by Keyword
+        Description: Searches ThreatIntelIndicatorsV2_CL for a keyword in the Message field. Use to find indicators matching a specific IP address, domain name, file hash, or threat term like ransomware.
+        Inputs:
+          - Name: Keyword
+            Description: The exact keyword to search for in the Message field, such as an IP address like 203.0.113.42, a domain like c2.malware-example.com, or a term like ransomware.
+            Required: true
+        Settings:
+          Target: Sentinel
+          TenantId: '{{TenantId}}'
+          SubscriptionId: '{{SubscriptionId}}'
+          ResourceGroupName: '{{ResourceGroupName}}'
+          WorkspaceName: '{{WorkspaceName}}'
+          Template: |-
+            ThreatIntelIndicatorsV2_CL
+            | where TimeGenerated > ago(30d)
+            | where Message has "{{Keyword}}"
+            | project TimeGenerated, Device, Message, Severity, Type
+            | sort by TimeGenerated desc
+
+      - Name: GetCriticalAndHighThreatIndicators
+        DisplayName: Get Critical and High Severity Threat Indicators
+        Description: Fetches all Critical and High severity indicators from ThreatIntelIndicatorsV2_CL for quick triage of the most urgent IOC matches.
+        Settings:
+          Target: Sentinel
+          TenantId: '{{TenantId}}'
+          SubscriptionId: '{{SubscriptionId}}'
+          ResourceGroupName: '{{ResourceGroupName}}'
+          WorkspaceName: '{{WorkspaceName}}'
+          Template: |-
+            ThreatIntelIndicatorsV2_CL
+            | where TimeGenerated > ago(30d)
+            | where Severity in ("Critical", "High")
+            | project TimeGenerated, Device, Message, Severity, Type
+            | sort by TimeGenerated desc
+
+      - Name: GetThreatIndicatorSummaryByDevice
+        DisplayName: Summarize Threat Indicators by Device
+        Description: Summarizes and counts threat intelligence indicators from ThreatIntelIndicatorsV2_CL grouped by device and severity to identify which devices have the most IOC hits.
+        Settings:
+          Target: Sentinel
+          TenantId: '{{TenantId}}'
+          SubscriptionId: '{{SubscriptionId}}'
+          ResourceGroupName: '{{ResourceGroupName}}'
+          WorkspaceName: '{{WorkspaceName}}'
+          Template: |-
+            ThreatIntelIndicatorsV2_CL
+            | where TimeGenerated > ago(30d)
+            | summarize IndicatorCount = count() by Device, Severity
+            | sort by IndicatorCount desc
